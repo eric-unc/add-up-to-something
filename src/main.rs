@@ -4,19 +4,23 @@ use std::io::BufWriter;
 use adder_codec_rs::adder_codec_core::{SourceCamera, TimeMode};
 use adder_codec_rs::adder_codec_core::codec::EncoderType;
 use adder_codec_rs::transcoder::source::framed::Framed;
-use adder_codec_rs::transcoder::source::video::{Source, VideoBuilder};
+use adder_codec_rs::transcoder::source::video::{Source, SourceError, VideoBuilder};
 use rayon::current_num_threads;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // TODO: this video is boring as fuck
-    let out = BufWriter::new(File::create("Apartment quiet.adder")?);
+    let out = BufWriter::new(File::create("out.adder")?);
 
     let mut framed_src = Framed::new(
         // the filename, color input, and scale
-        "Apartment quiet.mp4".to_string(), true, 0.5)?
+        "in.mp4".to_string(), false, 0.25)?
+        // the specific frame to start transcoding from
         .frame_start(0)?
         .write_out(SourceCamera::FramedU8, TimeMode::DeltaT, EncoderType::Raw, /*EncoderOptions::default(), */out)?
+        // Positive and negative contrast thresholds.
+        // Larger values -> more temporal loss, 0 -> nearly no distortion.
         .contrast_thresholds(10, 10)
+        // Show live view of the video as it is transcoded
         .show_display(true)
         .auto_time_parameters(255, 255 * 30, None)?;
 
@@ -26,15 +30,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap();
 
     loop {
+        // intake one frame worth of data
         match framed_src.consume(1, &pool) {
-            Ok(_) => {} // Returns Vec<Vec<Event>>, but we're just writing the events out in this example
+            Ok(events_in_frame) => {
+                for events_in_row in events_in_frame {
+                    for event in events_in_row {
+                        if event.coord.x == 309 && event.coord.y == 179 {
+                            println!("{:?}", event);
+                        }
+                    }
+                }
+            }
+            Err(SourceError::NoData) => break, // end of stream
             Err(e) => {
                 eprintln!("Err: {e:?}");
                 break;
             }
         }
-
-        // todo?
     }
 
     framed_src.get_video_mut().end_write_stream().unwrap();
