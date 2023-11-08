@@ -17,11 +17,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         // the specific frame to start transcoding from
         .frame_start(0)?
         .write_out(SourceCamera::FramedU8, TimeMode::DeltaT, EncoderType::Raw, /*EncoderOptions::default(), */out)?
-        // Positive and negative contrast thresholds.
-        // Larger values -> more temporal loss, 0 -> nearly no distortion.
-        .contrast_thresholds(10, 10)
+        // Constant Rate Factor (CRF) for encoder quality
+        // 0 is lossless, 9 is worst quality
+        .crf(5)
         // Show live view of the video as it is transcoded
         .show_display(true)
+        .detect_features(true, true)
         .auto_time_parameters(255, 255 * 30, None)?;
 
     let pool = rayon::ThreadPoolBuilder::new()
